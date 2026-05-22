@@ -13,6 +13,7 @@ Order of resolution:
 2. Auto-detection from config.yaml — currently maps:
    - database.backend == postgres        -> postgres
    - checkpointer.type == postgres       -> postgres
+   - database.backend == oceanbase       -> oceanbase
 
 Each extra name is validated against ``^[A-Za-z][A-Za-z0-9_-]*$`` (the same
 shape uv enforces for `[project.optional-dependencies]` keys). Anything else
@@ -231,6 +232,8 @@ def detect_from_config(path: Path) -> list[str]:
         extras.add("postgres")
     if (section_value(lines, "checkpointer", "type") or "").lower() == "postgres":
         extras.add("postgres")
+    if (section_value(lines, "database", "backend") or "").lower() == "oceanbase":
+        extras.add("oceanbase")
     if (nested_section_value(lines, "channels.discord", "enabled") or "").lower() == "true":
         extras.add("discord")
     return sorted(extras)

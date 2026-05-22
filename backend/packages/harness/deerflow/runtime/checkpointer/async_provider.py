@@ -3,7 +3,7 @@
 Provides an **async context manager** for long-running async servers that need
 proper resource cleanup.
 
-Supported backends: memory, sqlite, postgres.
+Supported backends: memory, sqlite, postgres, oceanbase.
 
 Usage (e.g. FastAPI lifespan)::
 
@@ -75,6 +75,17 @@ async def _async_checkpointer(config) -> AsyncIterator[Checkpointer]:
             yield saver
         return
 
+    if config.type == "oceanbase":
+        from deerflow.runtime.checkpointer.oceanbase_saver import AsyncOceanBaseSaver
+
+        if not config.connection_string:
+            raise ValueError("checkpointer.connection_string is required for the oceanbase backend")
+
+        async with AsyncOceanBaseSaver.from_conn_string(config.connection_string) as saver:
+            await saver.setup()
+            yield saver
+        return
+
     raise ValueError(f"Unknown checkpointer type: {config.type!r}")
 
 
@@ -115,6 +126,17 @@ async def _async_checkpointer_from_database(db_config) -> AsyncIterator[Checkpoi
             raise ValueError("database.postgres_url is required for the postgres backend")
 
         async with AsyncPostgresSaver.from_conn_string(db_config.postgres_url) as saver:
+            await saver.setup()
+            yield saver
+        return
+
+    if db_config.backend == "oceanbase":
+        from deerflow.runtime.checkpointer.oceanbase_saver import AsyncOceanBaseSaver
+
+        if not db_config.oceanbase_url:
+            raise ValueError("database.oceanbase_url is required for the oceanbase backend")
+
+        async with AsyncOceanBaseSaver.from_conn_string(db_config.oceanbase_url) as saver:
             await saver.setup()
             yield saver
         return

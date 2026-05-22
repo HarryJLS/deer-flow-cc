@@ -3,7 +3,8 @@
 Provides a **sync singleton** and a **sync context manager** for LangGraph
 graph compilation and CLI tools.
 
-Supported backends: memory, sqlite, postgres.
+Supported backends: memory, sqlite, postgres. (``oceanbase`` is async-only --
+use :mod:`deerflow.runtime.checkpointer.async_provider` from async contexts.)
 
 Usage::
 
@@ -90,6 +91,16 @@ def _sync_checkpointer_cm(config: CheckpointerConfig) -> Iterator[Checkpointer]:
             logger.info("Checkpointer: using PostgresSaver")
             yield saver
         return
+
+    if config.type == "oceanbase":
+        # OceanBase saver is async-only -- a sync wrapper would just shuttle
+        # asyncio loops around and provide no real value. Direct sync callers
+        # to use the async provider from an asyncio context instead.
+        raise NotImplementedError(
+            "OceanBase checkpointer is async-only. Use "
+            "deerflow.runtime.checkpointer.async_provider.make_checkpointer() "
+            "inside an asyncio context (e.g., FastAPI lifespan, asyncio.run)."
+        )
 
     raise ValueError(f"Unknown checkpointer type: {config.type!r}")
 

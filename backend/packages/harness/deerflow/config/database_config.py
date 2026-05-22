@@ -38,9 +38,9 @@ from pydantic import BaseModel, Field
 
 
 class DatabaseConfig(BaseModel):
-    backend: Literal["memory", "sqlite", "postgres"] = Field(
+    backend: Literal["memory", "sqlite", "postgres", "oceanbase"] = Field(
         default="memory",
-        description=("Storage backend for both checkpointer and application data. 'memory' for development (no persistence across restarts), 'sqlite' for single-node deployment, 'postgres' for production multi-node deployment."),
+        description=("Storage backend for both checkpointer and application data. 'memory' for development (no persistence across restarts), 'sqlite' for single-node deployment, 'postgres' for production multi-node deployment, 'oceanbase' for MySQL-compatible OceanBase clusters."),
     )
     sqlite_dir: str = Field(
         default=".deer-flow/data",
@@ -55,13 +55,34 @@ class DatabaseConfig(BaseModel):
             "(the +asyncpg driver suffix is added automatically where needed)."
         ),
     )
+    oceanbase_url: str = Field(
+        default="",
+        description=(
+            "OceanBase connection URL (MySQL wire protocol), shared by app ORM and "
+            "the self-built AsyncOceanBaseSaver. Use $OCEANBASE_URL in config.yaml "
+            "to reference .env. "
+            "Example: mysql://user:pass@host:2881/deerflow "
+            "(the +asyncmy driver suffix is added automatically where needed)."
+        ),
+    )
+    oceanbase_charset: str = Field(
+        default="utf8mb4",
+        description="Connection charset for OceanBase; utf8mb4 is required for full Unicode (including emoji).",
+    )
+    oceanbase_pool_recycle: int = Field(
+        default=3600,
+        description=(
+            "Seconds before idle connections are recycled. OBProxy defaults to cutting "
+            "idle connections at 7200s, so 3600s is the safe ceiling."
+        ),
+    )
     echo_sql: bool = Field(
         default=False,
         description="Echo all SQL statements to log (debug only).",
     )
     pool_size: int = Field(
         default=5,
-        description="Connection pool size for the app ORM engine (postgres only).",
+        description="Connection pool size for the app ORM engine (postgres / oceanbase only).",
     )
 
     # -- Derived helpers (not user-configured) --
@@ -98,5 +119,10 @@ class DatabaseConfig(BaseModel):
             url = self.postgres_url
             if url.startswith("postgresql://"):
                 url = url.replace("postgresql://", "postgresql+asyncpg://", 1)
+            return url
+        if self.backend == "oceanbase":
+            url = self.oceanbase_url
+            if url.startswith("mysql://"):
+                url = url.replace("mysql://", "mysql+asyncmy://", 1)
             return url
         raise ValueError(f"No SQLAlchemy URL for backend={self.backend!r}")

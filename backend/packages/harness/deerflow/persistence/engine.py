@@ -54,6 +54,41 @@ async def _auto_create_postgres_db(url: str) -> None:
         await maint_engine.dispose()
 
 
+async def _auto_create_mysql_db(url: str) -> None:
+    """Connect without a target database and CREATE DATABASE IF NOT EXISTS.
+
+    Mirrors :func:`_auto_create_postgres_db` for OceanBase / MySQL: drops the
+    database segment from the URL so the server accepts the connection, then
+    issues ``CREATE DATABASE IF NOT EXISTS`` with the project's standard
+    charset/collation.
+    """
+    from sqlalchemy import text
+    from sqlalchemy.engine.url import make_url
+
+    parsed = make_url(url)
+    db_name = parsed.database
+    if not db_name:
+        raise ValueError("Cannot auto-create OceanBase database: no database name in URL")
+
+    # SQLAlchemy URL.set() treats None as "don't change" (no-op). Use the
+    # underlying _replace() to actually strip the database segment so asyncmy
+    # connects to the server without selecting a schema at auth time.
+    maint_url = parsed._replace(database=None)
+    maint_engine = create_async_engine(maint_url)
+    try:
+        async with maint_engine.connect() as conn:
+            await conn.execute(
+                text(
+                    f"CREATE DATABASE IF NOT EXISTS `{db_name}` "
+                    "CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci"
+                )
+            )
+            await conn.commit()
+        logger.info("Auto-created OceanBase database: %s", db_name)
+    finally:
+        await maint_engine.dispose()
+
+
 async def init_engine(
     backend: str,
     *,
@@ -61,15 +96,18 @@ async def init_engine(
     echo: bool = False,
     pool_size: int = 5,
     sqlite_dir: str = "",
+    pool_recycle: int = 3600,
 ) -> None:
     """Create the async engine and session factory, then auto-create tables.
 
     Args:
-        backend: "memory", "sqlite", or "postgres".
-        url: SQLAlchemy async URL (for sqlite/postgres).
+        backend: "memory", "sqlite", "postgres", or "oceanbase".
+        url: SQLAlchemy async URL (for sqlite/postgres/oceanbase).
         echo: Echo SQL to log.
-        pool_size: Postgres connection pool size.
+        pool_size: Postgres/OceanBase connection pool size.
         sqlite_dir: Directory to create for SQLite (ensured to exist).
+        pool_recycle: Seconds before idle connections are recycled
+            (oceanbase only; OBProxy cuts idle connections at 7200s).
     """
     global _engine, _session_factory
 
@@ -89,6 +127,21 @@ async def init_engine(
                 "config.yaml (database.backend: postgres) and reinstalled, so it\n"
                 "will not be wiped again. Set UV_EXTRAS=postgres in .env to opt in\n"
                 "explicitly. Or switch to backend: sqlite in config.yaml for\n"
+                "single-node deployment."
+            ) from None
+
+    if backend == "oceanbase":
+        try:
+            import asyncmy  # noqa: F401
+        except ImportError:
+            raise ImportError(
+                "database.backend is set to 'oceanbase' but asyncmy is not installed.\n"
+                "Install it with:\n"
+                "    cd backend && uv sync --all-packages --extra oceanbase\n"
+                "On the next `make dev` the oceanbase extra is auto-detected from\n"
+                "config.yaml (database.backend: oceanbase) and reinstalled, so it\n"
+                "will not be wiped again. Set UV_EXTRAS=oceanbase in .env to opt\n"
+                "in explicitly. Or switch to backend: sqlite in config.yaml for\n"
                 "single-node deployment."
             ) from None
 
@@ -129,6 +182,31 @@ async def init_engine(
             pool_pre_ping=True,
             json_serializer=_json_serializer,
         )
+    elif backend == "oceanbase":
+        from sqlalchemy import event
+
+        _engine = create_async_engine(
+            url,
+            echo=echo,
+            pool_size=pool_size,
+            pool_pre_ping=True,
+            pool_recycle=pool_recycle,
+            json_serializer=_json_serializer,
+        )
+
+        # OceanBase / MySQL stores DATETIME without timezone info. Pin every
+        # session to UTC so naive timestamps round-trip correctly with the
+        # application layer which stores datetime.now(UTC). STRICT_TRANS_TABLES
+        # turns silent truncation into hard errors, matching the behaviour
+        # SQLite (busy_timeout) and Postgres already guarantee.
+        @event.listens_for(_engine.sync_engine, "connect")
+        def _set_oceanbase_session(dbapi_conn, _record):  # noqa: ARG001 — SQLAlchemy contract
+            cursor = dbapi_conn.cursor()
+            try:
+                cursor.execute("SET SESSION time_zone='+00:00'")
+                cursor.execute("SET SESSION sql_mode='STRICT_TRANS_TABLES,NO_ENGINE_SUBSTITUTION'")
+            finally:
+                cursor.close()
     else:
         raise ValueError(f"Unknown persistence backend: {backend!r}")
 
@@ -150,12 +228,40 @@ async def init_engine(
         async with _engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
     except Exception as exc:
-        if backend == "postgres" and "does not exist" in str(exc):
+        msg = str(exc)
+        if backend == "postgres" and "does not exist" in msg:
             # Database not yet created — attempt to auto-create it, then retry.
             await _auto_create_postgres_db(url)
             # Rebuild engine against the now-existing database
             await _engine.dispose()
             _engine = create_async_engine(url, echo=echo, pool_size=pool_size, pool_pre_ping=True, json_serializer=_json_serializer)
+            _session_factory = async_sessionmaker(_engine, expire_on_commit=False)
+            async with _engine.begin() as conn:
+                await conn.run_sync(Base.metadata.create_all)
+        elif backend == "oceanbase" and ("Unknown database" in msg or "1049" in msg):
+            # OceanBase reports missing schema as `Unknown database 'X' (1049)`.
+            await _auto_create_mysql_db(url)
+            from sqlalchemy import event
+
+            await _engine.dispose()
+            _engine = create_async_engine(
+                url,
+                echo=echo,
+                pool_size=pool_size,
+                pool_pre_ping=True,
+                pool_recycle=pool_recycle,
+                json_serializer=_json_serializer,
+            )
+
+            @event.listens_for(_engine.sync_engine, "connect")
+            def _set_oceanbase_session_retry(dbapi_conn, _record):  # noqa: ARG001
+                cursor = dbapi_conn.cursor()
+                try:
+                    cursor.execute("SET SESSION time_zone='+00:00'")
+                    cursor.execute("SET SESSION sql_mode='STRICT_TRANS_TABLES,NO_ENGINE_SUBSTITUTION'")
+                finally:
+                    cursor.close()
+
             _session_factory = async_sessionmaker(_engine, expire_on_commit=False)
             async with _engine.begin() as conn:
                 await conn.run_sync(Base.metadata.create_all)
@@ -176,6 +282,7 @@ async def init_engine_from_config(config) -> None:
         echo=config.echo_sql,
         pool_size=config.pool_size,
         sqlite_dir=config.sqlite_dir if config.backend == "sqlite" else "",
+        pool_recycle=config.oceanbase_pool_recycle if config.backend == "oceanbase" else 3600,
     )
 
 

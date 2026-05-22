@@ -38,6 +38,7 @@ dev = [
 [tool.pytest.ini_options]
 markers = [
     "no_auto_user: disable the conftest autouse contextvar fixture for this test",
+    "oceanbase: integration tests that require a live OceanBase / MySQL server (set OCEANBASE_TEST_URL)",
 ]
 
 [tool.uv]

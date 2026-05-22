@@ -1,4 +1,4 @@
-"""Dialect-aware JSON value matching for SQLAlchemy (SQLite + PostgreSQL)."""
+"""Dialect-aware JSON value matching for SQLAlchemy (SQLite + PostgreSQL + MySQL/OceanBase)."""
 
 from __future__ import annotations
 
@@ -130,6 +130,22 @@ _PG = _Dialect(
     bool_type="boolean",
 )
 
+# MySQL / OceanBase use the same wire protocol and JSON functions. The MySQL
+# `JSON_TYPE` builtin returns UPPERCASE type names (``INTEGER``, ``DOUBLE``,
+# ``STRING``, ``BOOLEAN``, ``NULL``) — case matters in the comparisons we emit.
+# Integers and doubles are distinguished by JSON_TYPE itself (unlike PG which
+# collapses them to ``number``), so no regex guard is needed.
+_OCEANBASE = _Dialect(
+    null_type="NULL",
+    num_types=("INTEGER", "DOUBLE", "DECIMAL"),
+    num_cast="DOUBLE",
+    int_types=("INTEGER",),
+    int_cast="SIGNED",
+    int_guard=None,
+    string_type="STRING",
+    bool_type="BOOLEAN",
+)
+
 
 def _bind(compiler: SQLCompiler, value: object, sa_type: TypeEngine[Any], **kw: Any) -> str:
     param = bindparam(None, value, type_=sa_type)
@@ -186,9 +202,28 @@ def _compile_pg(element: JsonMatch, compiler: SQLCompiler, **kw: Any) -> str:
     return _build_clause(compiler, typeof, extract, element.value, _PG, **kw)
 
 
+@compiles(JsonMatch, "mysql")
+def _compile_mysql(element: JsonMatch, compiler: SQLCompiler, **kw: Any) -> str:
+    """Compile JsonMatch for MySQL / OceanBase.
+
+    OceanBase identifies itself as the MySQL dialect in SQLAlchemy (the wire
+    protocol is MySQL), so a single ``"mysql"`` registration covers both.
+    Use ``JSON_EXTRACT`` + ``JSON_UNQUOTE`` to mirror the PG ``->>`` operator;
+    string comparisons must run against the unquoted value or every literal
+    would need to be wrapped in JSON-escape quotes.
+    """
+    if not validate_metadata_filter_key(element.key):
+        raise ValueError(f"Key escaped validation: {element.key!r}")
+    col = compiler.process(element.column, **kw)
+    path = f'$."{element.key}"'
+    typeof = f"JSON_TYPE(JSON_EXTRACT({col}, '{path}'))"
+    extract = f"JSON_UNQUOTE(JSON_EXTRACT({col}, '{path}'))"
+    return _build_clause(compiler, typeof, extract, element.value, _OCEANBASE, **kw)
+
+
 @compiles(JsonMatch)
 def _compile_default(element: JsonMatch, compiler: SQLCompiler, **kw: Any) -> str:
-    raise NotImplementedError(f"JsonMatch supports only sqlite and postgresql; got dialect: {compiler.dialect.name}")
+    raise NotImplementedError(f"JsonMatch supports only sqlite, postgresql, and mysql; got dialect: {compiler.dialect.name}")
 
 
 def json_match(column: ColumnElement, key: str, value: object) -> JsonMatch:

@@ -46,6 +46,9 @@ postgres = [
     "psycopg[binary]>=3.3.3",
     "psycopg-pool>=3.3.0",
 ]
+oceanbase = [
+    "asyncmy>=0.2.9",
+]
 pymupdf = ["pymupdf4llm>=0.0.17"]
 
 [build-system]

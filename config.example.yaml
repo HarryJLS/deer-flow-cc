@@ -878,9 +878,11 @@ skill_evolution:
 #              the extra is no longer wiped. To opt in explicitly (or layer
 #              extras like `postgres,ollama`), set in project-root .env:
 #                  UV_EXTRAS=postgres
+#              For OceanBase set `database.backend: oceanbase` (auto-detected)
+#              or `UV_EXTRAS=oceanbase` explicitly.
 #   Docker dev `make docker-start` reads `UV_EXTRAS` from project-root .env via
 #              `env_file`. Set:
-#                  UV_EXTRAS=postgres
+#                  UV_EXTRAS=postgres        # or UV_EXTRAS=oceanbase
 #              Multiple extras (`postgres,ollama`) supported here too — see
 #              docker/dev-entrypoint.sh.
 #   Docker img build-arg `UV_EXTRAS=postgres docker compose build` — single
@@ -889,6 +891,7 @@ skill_evolution:
 #
 # First-time bootstrap (before `make dev`):
 #   cd backend && uv sync --all-packages --extra postgres
+#   cd backend && uv sync --all-packages --extra oceanbase   # for OceanBase
 #   (--all-packages propagates the extra into workspace members — see PR #2584)
 #
 # NOTE: When both `checkpointer` and `database` are configured,
@@ -901,6 +904,18 @@ skill_evolution:
 # database:
 #   backend: postgres
 #   postgres_url: $DATABASE_URL
+#
+# OceanBase mode (MySQL-compatible distributed DB). Requires `asyncmy`:
+#   UV_EXTRAS=oceanbase  (or set database.backend below and `make dev`
+#                         auto-detects via scripts/detect_uv_extras.py)
+# Lock the cluster at OceanBase >= 4.2.1 so JSON, CTE, window functions,
+# and `ON DUPLICATE KEY UPDATE ... AS new` are all available.
+# database:
+#   backend: oceanbase
+#   oceanbase_url: $OCEANBASE_URL  # mysql://user:pass@host:2881/deerflow
+#   oceanbase_charset: utf8mb4
+#   oceanbase_pool_recycle: 3600   # OBProxy idles at 7200s; 3600 is the safe ceiling
+#   pool_size: 10
 database:
   backend: sqlite
   sqlite_dir: .deer-flow/data

@@ -193,6 +193,21 @@ Configuration priority:
 Config values starting with `$` are resolved as environment variables (e.g., `$OPENAI_API_KEY`).
 `ModelConfig` also declares `use_responses_api` and `output_version` so OpenAI `/v1/responses` can be enabled explicitly while still using `langchain_openai:ChatOpenAI`.
 
+**Database backend** (`config.yaml` → `database`):
+
+DeerFlow supports four storage backends, all sharing the same async SQLAlchemy
+engine and Alembic migrations:
+
+- `memory` — no persistence (development only)
+- `sqlite` — single-node deployment; uses WAL journal mode
+- `postgres` — production multi-node deployment; needs `--extra postgres` (`asyncpg`)
+- `oceanbase` — MySQL-compatible distributed DB; needs `--extra oceanbase` (`asyncmy`); requires OceanBase ≥ 4.2.1; full guide in [docs/OCEANBASE.md](docs/OCEANBASE.md)
+
+The `database.backend` value is auto-detected by `scripts/detect_uv_extras.py`
+so `make dev` re-installs the matching driver on every restart. JSON queries
+(`JsonMatch`) are dialect-aware via `persistence/json_compat.py`. Alembic uses
+`render_as_batch=True` only on SQLite — other dialects use native ALTER TABLE.
+
 **Extensions Configuration** (`extensions_config.json`):
 
 MCP servers and skills are configured together in `extensions_config.json` in project root:

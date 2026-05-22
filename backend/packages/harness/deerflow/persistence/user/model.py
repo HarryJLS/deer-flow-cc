@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
-from sqlalchemy import Boolean, DateTime, Index, String, text
+from sqlalchemy import Boolean, DateTime, Index, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from deerflow.persistence.base import Base
@@ -38,9 +38,11 @@ class UserRow(Base):
         default=lambda: datetime.now(UTC),
     )
 
-    # OAuth linkage (optional). A partial unique index enforces one
-    # account per (provider, oauth_id) pair, leaving NULL/NULL rows
-    # unconstrained so plain password accounts can coexist.
+    # OAuth linkage (optional). A plain UNIQUE index enforces one account per
+    # (provider, oauth_id) pair. SQL standard UNIQUE allows multiple NULL/NULL
+    # rows on all three backends we support (SQLite, PostgreSQL, MySQL /
+    # OceanBase), so password-only accounts can coexist without a partial
+    # index — which MySQL/OceanBase don't support anyway.
     oauth_provider: Mapped[str | None] = mapped_column(String(32), nullable=True)
     oauth_id: Mapped[str | None] = mapped_column(String(128), nullable=True)
 
@@ -54,6 +56,5 @@ class UserRow(Base):
             "oauth_provider",
             "oauth_id",
             unique=True,
-            sqlite_where=text("oauth_provider IS NOT NULL AND oauth_id IS NOT NULL"),
         ),
     )

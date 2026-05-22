@@ -498,7 +498,7 @@ class TestJsonMatchCompilation:
 
     def test_json_match_unsupported_dialect_raises(self):
         from sqlalchemy import Column, MetaData, String, Table
-        from sqlalchemy.dialects import mysql
+        from sqlalchemy.dialects import oracle
         from sqlalchemy.types import JSON
 
         from deerflow.persistence.json_compat import json_match
@@ -507,8 +507,10 @@ class TestJsonMatchCompilation:
         t = Table("t", metadata, Column("data", JSON), Column("id", String))
         expr = json_match(t.c.data, "k", "v")
 
-        with pytest.raises(NotImplementedError, match="mysql"):
-            str(expr.compile(dialect=mysql.dialect(), compile_kwargs={"literal_binds": True}))
+        # sqlite / postgresql / mysql are all supported now; anything else
+        # (oracle, mssql, snowflake, ...) must still raise.
+        with pytest.raises(NotImplementedError, match="sqlite, postgresql, and mysql"):
+            str(expr.compile(dialect=oracle.dialect(), compile_kwargs={"literal_binds": True}))
 
     def test_json_match_rejects_out_of_range_int(self):
         from sqlalchemy import Column, MetaData, String, Table
