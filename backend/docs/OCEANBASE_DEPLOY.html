@@ -1,0 +1,747 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DeerFlow × OceanBase 对接部署指南</title>
+<style>
+  :root {
+    --bg: #ffffff;
+    --fg: #1f2328;
+    --muted: #57606a;
+    --border: #d0d7de;
+    --code-bg: #f6f8fa;
+    --code-fg: #1f2328;
+    --link: #0969da;
+    --link-hover: #033d8c;
+    --table-header: #f6f8fa;
+    --table-row-alt: #fafbfc;
+    --warn-bg: #fff8c5;
+    --warn-border: #d4a72c;
+    --info-bg: #ddf4ff;
+    --info-border: #0969da;
+    --kbd-bg: #f6f8fa;
+    --kbd-border: #afb8c1;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0d1117;
+      --fg: #e6edf3;
+      --muted: #8b949e;
+      --border: #30363d;
+      --code-bg: #161b22;
+      --code-fg: #e6edf3;
+      --link: #2f81f7;
+      --link-hover: #58a6ff;
+      --table-header: #161b22;
+      --table-row-alt: #161b22;
+      --warn-bg: #3a2e04;
+      --warn-border: #d4a72c;
+      --info-bg: #0c2d6b;
+      --info-border: #2f81f7;
+      --kbd-bg: #161b22;
+      --kbd-border: #30363d;
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: var(--bg); color: var(--fg); }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB",
+                 "Microsoft YaHei", "Helvetica Neue", Helvetica, Arial, sans-serif;
+    line-height: 1.7;
+    font-size: 15px;
+    -webkit-font-smoothing: antialiased;
+  }
+  .layout {
+    display: grid;
+    grid-template-columns: 260px 1fr;
+    max-width: 1280px;
+    margin: 0 auto;
+  }
+  @media (max-width: 900px) {
+    .layout { grid-template-columns: 1fr; }
+    aside { position: static !important; max-height: none !important; border-right: none !important; border-bottom: 1px solid var(--border); }
+  }
+  aside {
+    position: sticky;
+    top: 0;
+    max-height: 100vh;
+    overflow-y: auto;
+    border-right: 1px solid var(--border);
+    padding: 20px 16px;
+    font-size: 13.5px;
+  }
+  aside h3 {
+    margin: 0 0 12px 0;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--muted);
+  }
+  aside ol { list-style: none; padding: 0; margin: 0; }
+  aside ol li { margin: 2px 0; }
+  aside a {
+    color: var(--fg);
+    text-decoration: none;
+    display: block;
+    padding: 5px 8px;
+    border-radius: 6px;
+    border-left: 2px solid transparent;
+  }
+  aside a:hover { background: var(--code-bg); color: var(--link); }
+  main {
+    padding: 36px 48px 80px 48px;
+    max-width: 980px;
+  }
+  h1, h2, h3, h4 {
+    line-height: 1.3;
+    font-weight: 600;
+    margin-top: 1.6em;
+    margin-bottom: 0.6em;
+  }
+  h1 { font-size: 28px; margin-top: 0; border-bottom: 1px solid var(--border); padding-bottom: 0.3em; }
+  h2 { font-size: 22px; border-bottom: 1px solid var(--border); padding-bottom: 0.3em; }
+  h3 { font-size: 18px; }
+  h4 { font-size: 15px; color: var(--muted); }
+  p { margin: 0.6em 0; }
+  a { color: var(--link); text-decoration: none; }
+  a:hover { color: var(--link-hover); text-decoration: underline; }
+  code {
+    font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+    background: var(--code-bg);
+    color: var(--code-fg);
+    padding: 1px 6px;
+    border-radius: 4px;
+    font-size: 0.88em;
+  }
+  pre {
+    background: var(--code-bg);
+    color: var(--code-fg);
+    padding: 14px 16px;
+    border-radius: 8px;
+    overflow-x: auto;
+    border: 1px solid var(--border);
+    font-size: 13px;
+    line-height: 1.55;
+  }
+  pre code {
+    background: transparent;
+    padding: 0;
+    border-radius: 0;
+    font-size: inherit;
+  }
+  blockquote {
+    margin: 1em 0;
+    padding: 10px 14px;
+    border-left: 4px solid var(--info-border);
+    background: var(--info-bg);
+    border-radius: 0 6px 6px 0;
+    color: var(--fg);
+  }
+  blockquote.warn {
+    border-left-color: var(--warn-border);
+    background: var(--warn-bg);
+  }
+  blockquote p { margin: 0.3em 0; }
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    margin: 1em 0;
+    font-size: 13.5px;
+    overflow-x: auto;
+    display: block;
+  }
+  @media (min-width: 900px) {
+    table { display: table; }
+  }
+  thead { background: var(--table-header); }
+  th, td {
+    border: 1px solid var(--border);
+    padding: 8px 12px;
+    text-align: left;
+    vertical-align: top;
+  }
+  tbody tr:nth-child(even) { background: var(--table-row-alt); }
+  hr {
+    border: none;
+    border-top: 1px solid var(--border);
+    margin: 2em 0;
+  }
+  ul, ol { padding-left: 1.6em; }
+  li { margin: 0.25em 0; }
+  .badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    color: var(--muted);
+    margin-left: 6px;
+    vertical-align: middle;
+  }
+  .anchor {
+    color: transparent;
+    text-decoration: none;
+    margin-left: 6px;
+    font-weight: normal;
+  }
+  h2:hover .anchor, h3:hover .anchor { color: var(--muted); }
+  footer {
+    margin-top: 4em;
+    padding-top: 1em;
+    border-top: 1px solid var(--border);
+    color: var(--muted);
+    font-size: 12.5px;
+  }
+  kbd {
+    background: var(--kbd-bg);
+    border: 1px solid var(--kbd-border);
+    border-bottom-width: 2px;
+    border-radius: 4px;
+    padding: 1px 5px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.8em;
+  }
+</style>
+</head>
+<body>
+<div class="layout">
+  <aside>
+    <h3>目录</h3>
+    <ol>
+      <li><a href="#tldr">0. TL;DR — 三分钟版</a></li>
+      <li><a href="#arch">1. 架构概览</a></li>
+      <li><a href="#prereq">2. 前置条件</a></li>
+      <li><a href="#ob-prep">3. OceanBase 侧准备</a></li>
+      <li><a href="#config">4. DeerFlow 配置</a></li>
+      <li><a href="#schema">5. 表结构</a></li>
+      <li><a href="#startup">6. 启动</a></li>
+      <li><a href="#verify">7. 验证清单</a></li>
+      <li><a href="#troubleshoot">8. 故障排查</a></li>
+      <li><a href="#ops">9. 运维事项</a></li>
+      <li><a href="#appendix">10. 附录</a></li>
+    </ol>
+  </aside>
+  <main>
+
+<h1>DeerFlow × OceanBase 对接部署指南</h1>
+
+<blockquote>
+<p><strong>目标</strong>：让一名运维 / 对接同学在拿到一个 OceanBase 集群之后，按这份文档把 DeerFlow 智能体应用从零跑起来。</p>
+<p><strong>适用版本</strong>：DeerFlow <code>main</code> 分支（含 <code>feat(persistence): add OceanBase backend</code> 提交），OceanBase ≥ 4.2.1。</p>
+<p><strong>与 <code>OCEANBASE.md</code> 的差异</strong>：后者偏重设计/原理，本文档偏重<strong>逐步操作</strong>与<strong>最少配置项清单</strong>。</p>
+</blockquote>
+
+<hr>
+
+<h2 id="tldr">0. TL;DR — 三分钟版 <a class="anchor" href="#tldr">¶</a></h2>
+
+<ol>
+  <li>OceanBase 集群升级到 ≥ 4.2.1（必须，否则 JSON / <code>ON DUPLICATE KEY UPDATE ... AS new</code> 不可用）。</li>
+  <li>创建一个空库 <code>deerflow</code>，charset = <code>utf8mb4</code>，collation = <code>utf8mb4_unicode_ci</code>。</li>
+  <li>创建一个用户，授予 <code>CREATE / SELECT / INSERT / UPDATE / DELETE / INDEX / ALTER</code> 七个权限。</li>
+  <li>在项目根 <code>.env</code> 中写入 <code>OCEANBASE_URL=mysql://user:pass@host:2881/deerflow</code>。</li>
+  <li>在项目根 <code>config.yaml</code> 中把 <code>database.backend</code> 改为 <code>oceanbase</code>，URL 填 <code>$OCEANBASE_URL</code>。</li>
+  <li><code>cd backend &amp;&amp; uv sync --all-packages --extra oceanbase</code>。</li>
+  <li>项目根 <code>make dev</code>。看到 Gateway 健康检查 200 即对接完成；表会自动建出来。</li>
+</ol>
+
+<p>剩下的所有内容都是对这 7 步的展开 + 排错。</p>
+
+<hr>
+
+<h2 id="arch">1. 架构概览 <a class="anchor" href="#arch">¶</a></h2>
+
+<p>DeerFlow 持久化分两层，OceanBase 同时承接：</p>
+
+<table>
+  <thead><tr><th>层</th><th>谁在写</th><th>表</th></tr></thead>
+  <tbody>
+    <tr><td>应用 ORM（async SQLAlchemy）</td><td>Gateway / <code>app.*</code> 路由</td><td><code>users</code>、<code>threads_meta</code>、<code>runs</code>、<code>run_events</code>、<code>feedback</code>（<strong>5 张</strong>）</td></tr>
+    <tr><td>LangGraph Checkpointer（<code>AsyncOceanBaseSaver</code>）</td><td>智能体运行时</td><td><code>checkpoints</code>、<code>writes</code>（<strong>2 张</strong>）</td></tr>
+  </tbody>
+</table>
+
+<p>两层<strong>共用同一个连接串</strong>（<code>database.oceanbase_url</code>），但用的是<strong>两个不同的连接池</strong>：</p>
+
+<ul>
+  <li>应用 ORM 用 <code>create_async_engine()</code> + asyncmy，由 <code>init_engine_from_config()</code> 初始化；</li>
+  <li>Checkpointer 由 <code>AsyncOceanBaseSaver.from_conn_string()</code> 在 FastAPI lifespan 内构建独立的 <code>asyncmy.Pool</code>。</li>
+</ul>
+
+<p>这意味着：<strong>OceanBase 端的连接数 ≈ <code>database.pool_size × 2 + 少量瞬时连接</code></strong>，估容时记得乘 2。</p>
+
+<blockquote class="warn">
+<p>⚠️ OceanBase Saver 是 <strong>async-only</strong>。同步 graph 编译路径（CLI、LangGraph Studio）一旦走 <code>oceanbase</code> 后端会抛 <code>NotImplementedError</code>。生产部署走 Gateway 的 FastAPI lifespan，本就是 async 的，<strong>没有影响</strong>。</p>
+</blockquote>
+
+<hr>
+
+<h2 id="prereq">2. 前置条件 <a class="anchor" href="#prereq">¶</a></h2>
+
+<h3>2.1 OceanBase 集群</h3>
+
+<table>
+  <thead><tr><th>项</th><th>要求</th><th>原因</th></tr></thead>
+  <tbody>
+    <tr><td>版本</td><td><strong>≥ 4.2.1</strong></td><td>JSON、CTE、窗口函数、<code>ON DUPLICATE KEY UPDATE ... AS new</code> 全部需要</td></tr>
+    <tr><td>模式</td><td>MySQL 兼容模式</td><td>DeerFlow 通过 MySQL wire 协议接入；Oracle 模式不支持</td></tr>
+    <tr><td><code>max_allowed_packet</code></td><td>≥ <strong>16 MB</strong></td><td><code>checkpoints.checkpoint</code> / <code>writes.value</code> 列是 <code>LONGBLOB</code>，单条最大可超 4 MB</td></tr>
+    <tr><td><code>lower_case_table_names</code></td><td>建议 <code>1</code></td><td>与 DDL 中的全小写表名一致，避免大小写歧义</td></tr>
+    <tr><td>字符集</td><td>数据库默认 <code>utf8mb4</code></td><td>否则 emoji / 4 字节 unicode 会被截断（且应用层 <code>STRICT_TRANS_TABLES</code> 会直接报错）</td></tr>
+    <tr><td>网络</td><td>OBProxy 端口可达（默认 <code>2881</code>）</td><td>客户端走 OBProxy，不直连 OBServer</td></tr>
+    <tr><td>时间戳</td><td>不要求容器时区，但建议 UTC</td><td>DeerFlow 每次建立会话都会 <code>SET SESSION time_zone='+00:00'</code></td></tr>
+  </tbody>
+</table>
+
+<h3>2.2 应用侧依赖</h3>
+<ul>
+  <li>Python 3.12+；</li>
+  <li><code>uv</code>（项目已锁定）；</li>
+  <li>网络能访问 OceanBase / OBProxy；</li>
+  <li>已经能跑通 <code>sqlite</code> backend（推荐先用 sqlite 跑一次，确认应用层无问题再切 OceanBase）。</li>
+</ul>
+
+<hr>
+
+<h2 id="ob-prep">3. OceanBase 侧准备 <a class="anchor" href="#ob-prep">¶</a></h2>
+
+<h3>3.1 建库</h3>
+
+<p>可以不手动建——DeerFlow 启动时 <code>_auto_create_mysql_db()</code> 检测到错误码 <code>1049 Unknown database</code> 会<strong>自动</strong>执行：</p>
+
+<pre><code>CREATE DATABASE IF NOT EXISTS `deerflow`
+  CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;</code></pre>
+
+<p>但这要求连接用户有 <code>CREATE</code> 权限。<strong>生产环境推荐手动建好</strong>，应用账号只授普通 DML/DDL 即可：</p>
+
+<pre><code>CREATE DATABASE IF NOT EXISTS deerflow
+  CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;</code></pre>
+
+<h3>3.2 建用户与授权</h3>
+
+<pre><code>-- 注意：OceanBase 多租户场景下用户名格式是 user@tenant#cluster
+-- 在连接串里需要把 @ 转义为 %40 —— 见 §4.1
+CREATE USER 'deerflow'@'%' IDENTIFIED BY '&lt;strong-password&gt;';
+
+GRANT
+  SELECT, INSERT, UPDATE, DELETE,   -- 业务读写
+  CREATE, ALTER, INDEX, REFERENCES, -- 第一次启动建表 / 后续 Alembic 迁移
+  CREATE TEMPORARY TABLES           -- JSON 大查询可能用到
+ON deerflow.* TO 'deerflow'@'%';
+
+FLUSH PRIVILEGES;</code></pre>
+
+<blockquote>
+<p>如果你<strong>不希望应用账号有 DDL 权限</strong>（推荐的安全姿势），那就先用 root 跑一次 <code>make dev</code> 让表全部建出来，然后回收 <code>CREATE/ALTER/INDEX</code>，之后只留 <code>SELECT/INSERT/UPDATE/DELETE</code>。</p>
+</blockquote>
+
+<h3>3.3 关键参数核查</h3>
+
+<p>在 OBServer 上确认：</p>
+
+<pre><code>-- 1. 字符集
+SHOW VARIABLES LIKE 'character_set_database';      -- utf8mb4
+SHOW VARIABLES LIKE 'collation_database';          -- utf8mb4_unicode_ci
+
+-- 2. 包大小
+SHOW VARIABLES LIKE 'max_allowed_packet';          -- ≥ 16777216 (16MB)
+
+-- 3. SQL 模式
+SHOW VARIABLES LIKE 'sql_mode';
+
+-- 4. OBProxy 空闲超时（默认 7200s，DeerFlow 默认在 3600s 回收，安全）
+SHOW PROXYCONFIG LIKE 'client_max_connections';</code></pre>
+
+<hr>
+
+<h2 id="config">4. DeerFlow 配置 <a class="anchor" href="#config">¶</a></h2>
+
+<h3>4.1 <code>.env</code> —— 写连接串</h3>
+
+<p>在<strong>项目根目录</strong>的 <code>.env</code> 中：</p>
+
+<pre><code># 普通租户 / 单租户
+OCEANBASE_URL="mysql://deerflow:secret@ob-proxy.example.com:2881/deerflow"
+
+# 多租户：用户名形如 deerflow@biz_tenant#prod_cluster
+# 必须把第一个 @ URL-encode 为 %40，否则 SQLAlchemy 会把 tenant 当作 host
+OCEANBASE_URL="mysql://deerflow%40biz_tenant%23prod_cluster:secret@ob-proxy.example.com:2881/deerflow"
+
+# 如果想让 make dev 自动加上 oceanbase 这个 uv extra（脚本会自动检测，多数时候不需要手动设）
+UV_EXTRAS=oceanbase</code></pre>
+
+<blockquote>
+<p><code>mysql://</code> 会被代码自动改写成 <code>mysql+asyncmy://</code>，<strong>不要</strong>手写驱动后缀，否则会破坏 URL 解析。</p>
+</blockquote>
+
+<h3>4.2 <code>config.yaml</code> —— 切后端</h3>
+
+<p>在<strong>项目根目录</strong>复制一份 <code>config.example.yaml</code> 为 <code>config.yaml</code>（如还没有），定位到 <code>database:</code> 段，改成：</p>
+
+<pre><code>database:
+  backend: oceanbase
+  oceanbase_url: $OCEANBASE_URL
+  oceanbase_charset: utf8mb4         # 默认值，不写也行
+  oceanbase_pool_recycle: 3600       # 默认值，OBProxy 默认 7200s 切空闲，半小时内回收最安全
+  pool_size: 10                      # 默认 5；OceanBase 是分布式 DB，10 起步比较舒服
+  echo_sql: false                    # 调试时可改 true</code></pre>
+
+<p>如果你同时显式配置了 <code>checkpointer:</code> 段（一般不需要），把它也设成同一个后端，<strong>别让两层各跑各的</strong>：</p>
+
+<pre><code># 可选：显式声明 checkpointer。不写则跟随 database.backend
+checkpointer:
+  type: oceanbase
+  connection_string: $OCEANBASE_URL</code></pre>
+
+<h3>4.3 全部 OceanBase 相关配置项一览</h3>
+
+<table>
+  <thead><tr><th>配置项</th><th>位置</th><th>默认值</th><th>说明</th></tr></thead>
+  <tbody>
+    <tr><td><code>database.backend</code></td><td><code>config.yaml</code></td><td><code>memory</code></td><td>必须改为 <code>oceanbase</code> 才会启用本后端</td></tr>
+    <tr><td><code>database.oceanbase_url</code></td><td><code>config.yaml</code>，建议引用 <code>$OCEANBASE_URL</code></td><td><code>""</code></td><td>连接串，<strong>必填</strong></td></tr>
+    <tr><td><code>database.oceanbase_charset</code></td><td><code>config.yaml</code></td><td><code>utf8mb4</code></td><td>连接级 charset，保持默认</td></tr>
+    <tr><td><code>database.oceanbase_pool_recycle</code></td><td><code>config.yaml</code></td><td><code>3600</code></td><td>秒；必须小于 OBProxy <code>client_max_idle_time</code></td></tr>
+    <tr><td><code>database.pool_size</code></td><td><code>config.yaml</code></td><td><code>5</code></td><td>单进程连接池；建议 10</td></tr>
+    <tr><td><code>database.echo_sql</code></td><td><code>config.yaml</code></td><td><code>false</code></td><td>仅调试用</td></tr>
+    <tr><td><code>OCEANBASE_URL</code></td><td><code>.env</code></td><td>—</td><td>推荐使用，便于隔离机密</td></tr>
+    <tr><td><code>UV_EXTRAS</code></td><td><code>.env</code>（可选）</td><td>自动检测</td><td><code>make dev</code> 会读 <code>config.yaml</code> 自动加 <code>oceanbase</code> extra</td></tr>
+    <tr><td><code>OCEANBASE_TEST_URL</code></td><td>shell（仅测试）</td><td>—</td><td>跑集成测试 <code>pytest -m oceanbase</code> 时指定测试库</td></tr>
+  </tbody>
+</table>
+
+<hr>
+
+<h2 id="schema">5. 表结构 <a class="anchor" href="#schema">¶</a></h2>
+
+<blockquote>
+<p>DeerFlow 启动时会通过 SQLAlchemy 的 <code>Base.metadata.create_all()</code> <strong>自动建表</strong>，<strong>对接同学通常不需要手动建任何表</strong>。</p>
+<p>下表用于：① 你想审计应用要在你的库里建哪些东西；② 你想提前手动建好以回收 DDL 权限。</p>
+</blockquote>
+
+<h3>5.1 表清单（7 张）</h3>
+
+<table>
+  <thead><tr><th>#</th><th>表名</th><th>来源</th><th>用途</th></tr></thead>
+  <tbody>
+    <tr><td>1</td><td><code>users</code></td><td>App ORM</td><td>用户账户、OAuth 绑定、JWT 版本</td></tr>
+    <tr><td>2</td><td><code>threads_meta</code></td><td>App ORM</td><td>会话元数据（标题、状态、所属用户）</td></tr>
+    <tr><td>3</td><td><code>runs</code></td><td>App ORM</td><td>单次 Run 的状态机 + token 计费</td></tr>
+    <tr><td>4</td><td><code>run_events</code></td><td>App ORM</td><td>一次 Run 的完整事件流（消息、追踪、生命周期）</td></tr>
+    <tr><td>5</td><td><code>feedback</code></td><td>App ORM</td><td>用户对 Run / 单条消息的 👍/👎 + 评论</td></tr>
+    <tr><td>6</td><td><code>checkpoints</code></td><td>LangGraph</td><td>智能体状态快照（一次 Run 多个）</td></tr>
+    <tr><td>7</td><td><code>writes</code></td><td>LangGraph</td><td>多分支 / pending writes 暂存</td></tr>
+  </tbody>
+</table>
+
+<h3>5.2 DDL 总览（参考用，启动会自动跑）</h3>
+
+<p>下面是各表在 OceanBase 上的最终样貌（应用 ORM 的部分由 SQLAlchemy 编译生成；checkpointer 两张表的 DDL 是手写在 <code>_oceanbase_schema.sql</code> 里的）：</p>
+
+<pre><code>-- ============ App ORM 5 张 ============
+
+CREATE TABLE users (
+  id              VARCHAR(36)  NOT NULL,
+  email           VARCHAR(320) NOT NULL,
+  password_hash   VARCHAR(128),
+  system_role     VARCHAR(16)  NOT NULL DEFAULT 'user',
+  created_at      DATETIME     NOT NULL,
+  oauth_provider  VARCHAR(32),
+  oauth_id        VARCHAR(128),
+  needs_setup     TINYINT(1)   NOT NULL DEFAULT 0,
+  token_version   INT          NOT NULL DEFAULT 0,
+  PRIMARY KEY (id),
+  UNIQUE KEY ix_users_email (email),
+  UNIQUE KEY idx_users_oauth_identity (oauth_provider, oauth_id)
+) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE threads_meta (
+  thread_id     VARCHAR(64)  NOT NULL,
+  assistant_id  VARCHAR(128),
+  user_id       VARCHAR(64),
+  display_name  VARCHAR(256),
+  status        VARCHAR(20)  NOT NULL DEFAULT 'idle',
+  metadata_json JSON,
+  created_at    DATETIME     NOT NULL,
+  updated_at    DATETIME     NOT NULL,
+  PRIMARY KEY (thread_id),
+  KEY ix_threads_meta_assistant_id (assistant_id),
+  KEY ix_threads_meta_user_id (user_id)
+) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE runs (
+  run_id              VARCHAR(64)  NOT NULL,
+  thread_id           VARCHAR(64)  NOT NULL,
+  assistant_id        VARCHAR(128),
+  user_id             VARCHAR(64),
+  status              VARCHAR(20)  NOT NULL DEFAULT 'pending',
+  model_name          VARCHAR(128),
+  multitask_strategy  VARCHAR(20)  NOT NULL DEFAULT 'reject',
+  metadata_json       JSON,
+  kwargs_json         JSON,
+  error               TEXT,
+  message_count       INT          NOT NULL DEFAULT 0,
+  first_human_message TEXT,
+  last_ai_message     TEXT,
+  total_input_tokens  INT          NOT NULL DEFAULT 0,
+  total_output_tokens INT          NOT NULL DEFAULT 0,
+  total_tokens        INT          NOT NULL DEFAULT 0,
+  llm_call_count      INT          NOT NULL DEFAULT 0,
+  lead_agent_tokens   INT          NOT NULL DEFAULT 0,
+  subagent_tokens     INT          NOT NULL DEFAULT 0,
+  middleware_tokens   INT          NOT NULL DEFAULT 0,
+  follow_up_to_run_id VARCHAR(64),
+  created_at          DATETIME     NOT NULL,
+  updated_at          DATETIME     NOT NULL,
+  PRIMARY KEY (run_id),
+  KEY ix_runs_thread_id (thread_id),
+  KEY ix_runs_user_id (user_id),
+  KEY ix_runs_thread_status (thread_id, status)
+) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE run_events (
+  id              BIGINT       NOT NULL AUTO_INCREMENT,
+  thread_id       VARCHAR(64)  NOT NULL,
+  run_id          VARCHAR(64)  NOT NULL,
+  user_id         VARCHAR(64),
+  event_type      VARCHAR(32)  NOT NULL,
+  category        VARCHAR(16)  NOT NULL,
+  content         TEXT,
+  event_metadata  JSON,
+  seq             INT          NOT NULL,
+  created_at      DATETIME     NOT NULL,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_events_thread_seq (thread_id, seq),
+  KEY ix_run_events_user_id (user_id),
+  KEY ix_events_thread_cat_seq (thread_id, category, seq),
+  KEY ix_events_run (thread_id, run_id, seq)
+) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE feedback (
+  feedback_id  VARCHAR(64)  NOT NULL,
+  run_id       VARCHAR(64)  NOT NULL,
+  thread_id    VARCHAR(64)  NOT NULL,
+  user_id      VARCHAR(64),
+  message_id   VARCHAR(64),
+  rating       INT          NOT NULL,
+  comment      TEXT,
+  created_at   DATETIME     NOT NULL,
+  PRIMARY KEY (feedback_id),
+  UNIQUE KEY uq_feedback_thread_run_user (thread_id, run_id, user_id),
+  KEY ix_feedback_run_id (run_id),
+  KEY ix_feedback_thread_id (thread_id),
+  KEY ix_feedback_user_id (user_id)
+) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ============ LangGraph Checkpointer 2 张 ============
+
+CREATE TABLE checkpoints (
+  thread_id            VARCHAR(128) NOT NULL,
+  checkpoint_ns        VARCHAR(128) NOT NULL DEFAULT '',
+  checkpoint_id        VARCHAR(128) NOT NULL,
+  parent_checkpoint_id VARCHAR(128),
+  type                 VARCHAR(64),
+  checkpoint           LONGBLOB,
+  metadata             LONGBLOB,
+  PRIMARY KEY (thread_id, checkpoint_ns, checkpoint_id)
+) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE writes (
+  thread_id     VARCHAR(128) NOT NULL,
+  checkpoint_ns VARCHAR(128) NOT NULL DEFAULT '',
+  checkpoint_id VARCHAR(128) NOT NULL,
+  task_id       VARCHAR(128) NOT NULL,
+  idx           INT          NOT NULL,
+  channel       VARCHAR(255) NOT NULL,
+  type          VARCHAR(64),
+  value         LONGBLOB,
+  PRIMARY KEY (thread_id, checkpoint_ns, checkpoint_id, task_id, idx)
+) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;</code></pre>
+
+<blockquote>
+<p>上面 7 张表 DDL 的源头：5 张 ORM 表来自 <code>backend/packages/harness/deerflow/persistence/**/model.py</code>；2 张 checkpoint 表来自 <code>backend/packages/harness/deerflow/runtime/checkpointer/_oceanbase_schema.sql</code>。这两张表是在第一次 <code>AsyncOceanBaseSaver.setup()</code> 时通过执行该 SQL 文件建出来的（<code>IF NOT EXISTS</code>，幂等）。</p>
+</blockquote>
+
+<h3>5.3 容量与索引建议</h3>
+
+<ul>
+  <li><code>run_events</code> 是写入热点：每条用户/AI/工具消息都会落一行。建议<strong>单独</strong>关注它的分区策略。如果 OceanBase 集群支持表分区，可以按 <code>thread_id</code> 哈希分区。</li>
+  <li><code>checkpoints.checkpoint</code> / <code>writes.value</code> 是 <code>LONGBLOB</code>，<strong>单行可超过 1 MB</strong>。请确认 <code>max_allowed_packet ≥ 16 MB</code>。</li>
+  <li><code>feedback</code> 行很稀疏，长尾增长，不需要分区。</li>
+  <li><code>users</code> 通常是小表（&lt; 10k 行级），按 PK + email 走即可。</li>
+</ul>
+
+<hr>
+
+<h2 id="startup">6. 启动 <a class="anchor" href="#startup">¶</a></h2>
+
+<h3>6.1 安装依赖</h3>
+
+<pre><code>cd backend
+uv sync --all-packages --extra oceanbase</code></pre>
+
+<blockquote>
+<p>后续 <code>make dev</code> 会通过 <code>scripts/detect_uv_extras.py</code> 读取 <code>config.yaml</code> 中 <code>database.backend == oceanbase</code>，自动追加 <code>--extra oceanbase</code>，所以这一步<strong>只在首次需要</strong>手动跑。</p>
+</blockquote>
+
+<h3>6.2 启动全部服务</h3>
+
+<pre><code># 项目根目录
+make dev</code></pre>
+
+<p>启动流程会做四件事：</p>
+
+<ol>
+  <li>解析 <code>config.yaml</code>，确认 <code>database.backend = oceanbase</code>。</li>
+  <li><code>init_engine_from_config()</code> 建 ORM 连接池，必要时自动建库（错误码 1049 触发 <code>_auto_create_mysql_db</code>）。</li>
+  <li>SQLAlchemy <code>create_all()</code> 把 5 张 ORM 表建出来（已存在则跳过）。</li>
+  <li>FastAPI lifespan 拉起 <code>AsyncOceanBaseSaver</code>，执行 <code>_oceanbase_schema.sql</code>，建出 <code>checkpoints</code> / <code>writes</code> 两张表。</li>
+</ol>
+
+<h3>6.3 仅启动后端</h3>
+
+<pre><code>cd backend &amp;&amp; make gateway</code></pre>
+
+<hr>
+
+<h2 id="verify">7. 验证清单 <a class="anchor" href="#verify">¶</a></h2>
+
+<p>按下面 5 步逐一确认，每一步都过了再去交付：</p>
+
+<pre><code># 1. 健康检查
+curl -fsS http://localhost:8001/health
+# → 200 OK
+
+# 2. 表全部建出来（7 张）
+mysql -h &lt;ob-proxy&gt; -P 2881 -u deerflow -p deerflow -e "SHOW TABLES;"
+# → users / threads_meta / runs / run_events / feedback / checkpoints / writes
+
+# 3. 字符集真的是 utf8mb4
+mysql -h &lt;ob-proxy&gt; -P 2881 -u deerflow -p deerflow -e \
+  "SELECT TABLE_NAME, TABLE_COLLATION FROM information_schema.tables
+   WHERE TABLE_SCHEMA='deerflow';"
+# → 所有行 TABLE_COLLATION 都应该是 utf8mb4_unicode_ci
+
+# 4. 跑一次完整对话（前端 http://localhost:2026 ，或直接调 /api/runs/wait）
+#    然后看库里有数据：
+mysql ... -e "SELECT COUNT(*) FROM runs;"
+mysql ... -e "SELECT COUNT(*) FROM run_events;"
+mysql ... -e "SELECT COUNT(*) FROM checkpoints;"
+# → 三个计数都应 &gt; 0
+
+# 5. （可选）跑集成测试
+docker run -d --name ob -p 2881:2881 oceanbase/oceanbase-ce:4.2.1
+cd backend &amp;&amp; OCEANBASE_TEST_URL='mysql://root@127.0.0.1:2881/deerflow_test' \
+  PYTHONPATH=. uv run pytest -m oceanbase -v</code></pre>
+
+<hr>
+
+<h2 id="troubleshoot">8. 故障排查 <a class="anchor" href="#troubleshoot">¶</a></h2>
+
+<table>
+  <thead><tr><th>现象</th><th>原因</th><th>处理</th></tr></thead>
+  <tbody>
+    <tr><td><code>ImportError: asyncmy is not installed</code></td><td>没装 oceanbase extra</td><td><code>uv sync --all-packages --extra oceanbase</code>；或在 <code>.env</code> 加 <code>UV_EXTRAS=oceanbase</code></td></tr>
+    <tr><td><code>Unknown database 'deerflow' (1049)</code> 且没有自动创建</td><td>应用账号没有 <code>CREATE</code> 权限</td><td>临时给 <code>CREATE</code>，或手动 <code>CREATE DATABASE deerflow CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;</code></td></tr>
+    <tr><td><code>Access denied for user 'deerflow@biz_tenant#prod'@'%'</code></td><td>多租户连接串没转义</td><td>把 <code>@</code> → <code>%40</code>，<code>#</code> → <code>%23</code></td></tr>
+    <tr><td>时间戳少 8 小时 / 多 8 小时</td><td>没跑到 <code>SET SESSION time_zone='+00:00'</code></td><td>确认 driver 是 <code>asyncmy</code>（不是 <code>aiomysql</code>）；查 <code>init_engine()</code> 是否走到 <code>event.listens_for(_engine.sync_engine, "connect")</code> 这段</td></tr>
+    <tr><td><code>Data too long for column 'X'</code></td><td><code>STRICT_TRANS_TABLES</code> 在拦截</td><td>这是<strong>故意</strong>的——业务数据被异常截断时不再静默成功。查上层应用为何要写超长数据</td></tr>
+    <tr><td>长时间空闲后下一条查询失败</td><td>OBProxy 把空闲连接切了</td><td>降低 <code>database.oceanbase_pool_recycle</code>（默认 3600s），并确认 <code>pool_pre_ping=True</code> 已生效</td></tr>
+    <tr><td><code>Packet for query is too large</code></td><td><code>max_allowed_packet</code> 太小</td><td>集群侧调到 ≥ 16MB（checkpoint blob 可能很大）</td></tr>
+    <tr><td>启动报 <code>OceanBase checkpointer is async-only</code></td><td>走了同步 graph 编译路径（如 LangGraph CLI）</td><td>切到 async 入口（FastAPI Gateway / <code>asyncio.run</code>），生产 <code>make dev</code> 不会触发</td></tr>
+    <tr><td><code>LockWaitTimeoutExceeded</code></td><td><code>runs.status</code> 更新冲突</td><td>检查是否同一个 run_id 被并发 update；正常情况下 <code>RunManager</code> 会保证单写者</td></tr>
+  </tbody>
+</table>
+
+<p>详细排错（含原因）见 <a href="OCEANBASE.md">OCEANBASE.md</a>。</p>
+
+<hr>
+
+<h2 id="ops">9. 运维事项 <a class="anchor" href="#ops">¶</a></h2>
+
+<h3>9.1 监控</h3>
+
+<p>最少观察这三类指标：</p>
+
+<table>
+  <thead><tr><th>指标</th><th>来源</th><th>告警阈值（建议）</th></tr></thead>
+  <tbody>
+    <tr><td>SQLAlchemy 池水位（active / overflow）</td><td><code>_engine.pool.status()</code>，或 Prometheus exporter</td><td>active &gt; <code>pool_size</code> 持续 5 分钟</td></tr>
+    <tr><td><code>run_events</code> 行增量</td><td>OceanBase 本身的 row-stats</td><td>增量突降 → 应用 Run 量异常</td></tr>
+    <tr><td>慢查询</td><td>OceanBase <code>gv$sql_audit</code></td><td>单条 &gt; 1s 应排查（一般是 JSON path 没走索引）</td></tr>
+  </tbody>
+</table>
+
+<h3>9.2 备份</h3>
+
+<p>5 张 ORM 表 + 2 张 checkpoint 表都是单库内的普通 InnoDB-on-OceanBase 表。直接走集群标准物理备份 / 逻辑备份策略即可，<strong>没有任何需要单独处理的特殊文件</strong>（智能体本地缓存如 <code>.deer-flow/users/</code>、<code>skills/custom/</code> 在文件系统，不在 OceanBase 内）。</p>
+
+<h3>9.3 升级 DeerFlow 时</h3>
+
+<p>应用层 schema 用 Alembic 管理。OceanBase 端表结构变化时，请优先走：</p>
+
+<pre><code>cd backend &amp;&amp; uv run alembic upgrade head</code></pre>
+
+<p><code>alembic/env.py</code> 已经做了 dialect 区分：SQLite 才走 batch 模式，OceanBase 走原生 <code>ALTER TABLE</code>。</p>
+
+<hr>
+
+<h2 id="appendix">10. 附录 <a class="anchor" href="#appendix">¶</a></h2>
+
+<h3>10.1 与其它 backend 的差异表</h3>
+
+<table>
+  <thead><tr><th>维度</th><th>sqlite</th><th>postgres</th><th>oceanbase</th></tr></thead>
+  <tbody>
+    <tr><td>适用规模</td><td>单节点开发</td><td>中小生产</td><td>大规模生产 / 已有 OB 集群</td></tr>
+    <tr><td>Driver</td><td><code>aiosqlite</code>（内置）</td><td><code>asyncpg</code></td><td><code>asyncmy</code>（<code>--extra oceanbase</code>）</td></tr>
+    <tr><td>Checkpointer</td><td><code>AsyncSqliteSaver</code>（官方）</td><td><code>AsyncPostgresSaver</code>（官方）</td><td><code>AsyncOceanBaseSaver</code>（自研，async-only）</td></tr>
+    <tr><td>JSON 查询</td><td><code>json_extract</code></td><td><code>-&gt;&gt;</code> + <code>::cast</code></td><td><code>JSON_EXTRACT</code> + <code>JSON_UNQUOTE</code> + <code>JSON_TYPE</code></td></tr>
+    <tr><td>Alembic 模式</td><td>batch</td><td>原生 ALTER</td><td>原生 ALTER</td></tr>
+    <tr><td>时区</td><td>TZ-aware DATETIME</td><td>TZ-aware TIMESTAMP</td><td>naive DATETIME + session <code>time_zone='+00:00'</code></td></tr>
+    <tr><td>自动建库</td><td>N/A</td><td>1049-like 触发</td><td>1049 触发 <code>_auto_create_mysql_db</code></td></tr>
+  </tbody>
+</table>
+
+<h3>10.2 相关代码位置</h3>
+
+<table>
+  <thead><tr><th>模块</th><th>路径</th></tr></thead>
+  <tbody>
+    <tr><td>数据库配置</td><td><code>backend/packages/harness/deerflow/config/database_config.py</code></td></tr>
+    <tr><td>Checkpointer 配置</td><td><code>backend/packages/harness/deerflow/config/checkpointer_config.py</code></td></tr>
+    <tr><td>ORM 引擎初始化</td><td><code>backend/packages/harness/deerflow/persistence/engine.py</code></td></tr>
+    <tr><td>OceanBase Saver</td><td><code>backend/packages/harness/deerflow/runtime/checkpointer/oceanbase_saver.py</code></td></tr>
+    <tr><td>Checkpoint DDL</td><td><code>backend/packages/harness/deerflow/runtime/checkpointer/_oceanbase_schema.sql</code></td></tr>
+    <tr><td>JSON 方言适配</td><td><code>backend/packages/harness/deerflow/persistence/json_compat.py</code></td></tr>
+    <tr><td>Alembic 迁移环境</td><td><code>backend/packages/harness/deerflow/persistence/migrations/env.py</code></td></tr>
+    <tr><td><code>uv extras</code> 自动检测</td><td><code>scripts/detect_uv_extras.py</code></td></tr>
+    <tr><td>设计原理文档</td><td><code>backend/docs/OCEANBASE.md</code></td></tr>
+  </tbody>
+</table>
+
+<h3>10.3 一键回退到 sqlite</h3>
+
+<p>如果要临时把 OceanBase 摘掉跑本地：</p>
+
+<pre><code># config.yaml
+database:
+  backend: sqlite
+  sqlite_dir: .deer-flow/data</code></pre>
+
+<p><code>make dev</code> 即可。原 OceanBase 数据保留在 OceanBase 端，回切时数据仍在。</p>
+
+<footer>
+  <p><strong>问题反馈</strong>：在仓库 issues 提 <code>oceanbase</code> 标签，附上 §7 验证清单的执行结果。</p>
+  <p>本 HTML 由 <code>backend/docs/OCEANBASE_DEPLOY.md</code> 同步生成。生成日期：2026-05-22。</p>
+</footer>
+
+  </main>
+</div>
+</body>
+</html>
